@@ -1,7 +1,7 @@
 <template>
   <div class="day-view">
     <div class="header">
-      <h2>{{ currentDay }}. Gün Antrenmanııı</h2>
+      <h2>{{ currentDay }}. Gün Antrenmanı</h2>
       <h3 class="program-type">{{ gunBasligi }}</h3>
     </div>
     <div class="exercises">
