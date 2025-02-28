@@ -5,9 +5,6 @@ import { RouterLink, RouterView } from 'vue-router'
 
 <template>
   <div class="app">
-    <header>
-      <h1>Antrenman Takip</h1>
-    </header>
     <main>
       <router-view></router-view>
     </main>

@@ -3,6 +3,48 @@
     <div class="header">
       <h2>{{ currentDay }}. Gün Antrenmanı</h2>
       <h3 class="program-type">{{ gunBasligi }}</h3>
+      
+      <!-- Yeni eklenen achievements bölümü -->
+      <div class="achievements-section">
+        <!-- Günlük hedef -->
+        <div class="daily-goals">
+          <h4>Günlük Hedef</h4>
+          <div class="goal-card">
+            <div class="goal-info">
+              <span class="goal-name">{{ currentDayGoal.name }}</span>
+              <div class="progress-bar">
+                <div :style="{ width: (currentDayGoal.progress / currentDayGoal.target * 100) + '%' }" class="progress"></div>
+              </div>
+              <span class="goal-progress">{{ currentDayGoal.progress }}/{{ currentDayGoal.target }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Haftalık hedef -->
+        <div class="weekly-goals">
+          <h4>Haftalık Hedef</h4>
+          <div class="goal-card">
+            <div class="goal-info">
+              <span class="goal-name">{{ weeklyGoal.name }}</span>
+              <div class="progress-bar">
+                <div :style="{ width: (weeklyGoal.progress / weeklyGoal.target * 100) + '%' }" class="progress"></div>
+              </div>
+              <span class="goal-progress">{{ weeklyGoal.progress }}/{{ weeklyGoal.target }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Rozetler -->
+        <div class="badges">
+          <h4>Rozetlerim</h4>
+          <div class="badges-container">
+            <div v-for="badge in unlockedBadges" :key="badge.id" class="badge-item">
+              <span class="badge-icon">{{ badge.icon }}</span>
+              <span class="badge-name">{{ badge.name }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="exercises">
       <div v-for="(hareket, index) in gununHareketleri" :key="index" class="exercise-card">
@@ -18,6 +60,15 @@
       </div>
     </div>
     <router-link to="/" class="back-button">Ana Sayfaya Dön</router-link>
+    
+    <!-- Tamamla butonu -->
+    <button 
+      @click="completeWorkout" 
+      class="complete-button"
+      :disabled="currentDayGoal.completed"
+    >
+      {{ currentDayGoal.completed ? 'Antrenman Tamamlandı ✅' : 'Antrenmanı Tamamla 🎯' }}
+    </button>
 
     <!-- Modal -->
     <div v-if="selectedGif" class="modal" @click="closeModal">
@@ -32,9 +83,13 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { antrenmanVerisi } from '../data/workouts';
+import { achievements } from '../data/achievements';
+import { db, auth } from '../firebase/config';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const route = useRoute();
 const currentDay = computed(() => route.params.id);
@@ -54,6 +109,59 @@ const gununHareketleri = computed(() => {
 
 const selectedGif = ref(null);
 
+const currentDayGoal = computed(() => achievements.goals.daily[currentDay.value]);
+const weeklyGoal = computed(() => achievements.goals.weekly);
+const unlockedBadges = computed(() => achievements.badges.filter(badge => badge.unlocked));
+
+const userId = ref(null);
+
+// Firebase'den ilerlemeyi yükle
+const loadProgress = async () => {
+  if (!userId.value) return;
+  
+  try {
+    const docRef = doc(db, "progress", userId.value);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      achievements.goals.daily = data.dailyGoals;
+      achievements.goals.weekly = data.weeklyGoal;
+      achievements.badges = data.badges;
+    }
+  } catch (error) {
+    console.error("Error loading progress:", error);
+  }
+};
+
+// Firebase'e ilerlemeyi kaydet
+const saveProgress = async () => {
+  if (!userId.value) return;
+  
+  try {
+    await setDoc(doc(db, "progress", userId.value), {
+      dailyGoals: achievements.goals.daily,
+      weeklyGoal: achievements.goals.weekly,
+      badges: achievements.badges,
+      lastUpdated: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Error saving progress:", error);
+  }
+};
+
+// Kullanıcı oturum durumunu kontrol et
+onMounted(() => {
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      userId.value = user.uid;
+      loadProgress(); // Kullanıcı verilerini yükle
+    } else {
+      userId.value = null;
+    }
+  });
+});
+
 const openModal = (hareket) => {
   selectedGif.value = hareket;
   document.body.style.overflow = 'hidden'; // Scroll'u engelle
@@ -62,6 +170,29 @@ const openModal = (hareket) => {
 const closeModal = () => {
   selectedGif.value = null;
   document.body.style.overflow = 'auto'; // Scroll'u geri aç
+};
+
+// completeWorkout fonksiyonunu güncelle
+const completeWorkout = async () => {
+  if (!currentDayGoal.value.completed) {
+    currentDayGoal.value.progress = 1;
+    currentDayGoal.value.completed = true;
+    
+    weeklyGoal.value.progress++;
+    
+    if (!achievements.badges[0].unlocked) {
+      achievements.badges[0].unlocked = true;
+    }
+    
+    if (weeklyGoal.value.progress >= weeklyGoal.value.target) {
+      achievements.badges[1].unlocked = true;
+      weeklyGoal.value.completed = true;
+      alert('Tebrikler! Tüm haftayı tamamladınız! 🎉');
+    }
+
+    await saveProgress(); // Firebase'e kaydet
+    alert('Tebrikler! Antrenmanı tamamladınız! 🎉');
+  }
 };
 </script>
 
@@ -321,5 +452,160 @@ h3 {
   .close-icon {
     font-size: 20px;
   }
+}
+
+.achievements-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.daily-goals, .weekly-goals, .badges {
+  margin: 1.5rem 0;
+}
+
+.daily-goals h4, .weekly-goals h4, .badges h4 {
+  color: #2c3e50;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.goal-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin: 0.8rem 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.goal-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.goal-name {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.goal-progress {
+  font-size: 0.9rem;
+  color: #666;
+  text-align: right;
+  margin-top: 0.3rem;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 10px;
+  background: #e9ecef;
+  border-radius: 5px;
+  overflow: hidden;
+  margin: 0.5rem 0;
+}
+
+.progress {
+  height: 100%;
+  background: linear-gradient(90deg, #27ae60, #2ecc71);
+  transition: width 0.3s ease;
+  border-radius: 5px;
+}
+
+.badges-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.badge-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: white;
+  padding: 1.2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: transform 0.2s ease;
+}
+
+.badge-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.badge-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.badge-name {
+  font-size: 0.9rem;
+  text-align: center;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .achievements-section {
+    margin-top: 1rem;
+    padding: 1rem;
+  }
+  
+  .goal-card {
+    padding: 1rem;
+  }
+  
+  .badges-container {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 0.8rem;
+  }
+  
+  .badge-item {
+    padding: 1rem;
+  }
+  
+  .badge-icon {
+    font-size: 2rem;
+  }
+  
+  .goal-name {
+    font-size: 1rem;
+  }
+  
+  .progress-bar {
+    height: 8px;
+  }
+}
+
+.complete-button {
+  display: block;
+  width: fit-content;
+  margin: 2rem auto;
+  padding: 12px 24px;
+  background-color: #27ae60;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.complete-button:hover {
+  background-color: #219a52;
+  transform: scale(1.05);
+}
+
+.complete-button:disabled {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+  transform: none;
 }
 </style> 
