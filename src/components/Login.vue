@@ -15,26 +15,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import { auth } from '../firebase/config';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 const isLoggedIn = ref(false);
+const error = ref(null);
 
 const signInWithGoogle = async () => {
   try {
+    error.value = null;
     const provider = new GoogleAuthProvider();
     await signInWithPopup(auth, provider);
-  } catch (error) {
-    console.error("Error signing in with Google:", error);
+  } catch (err) {
+    console.error("Error signing in with Google:", err);
+    error.value = err.message;
   }
 };
-
-onMounted(() => {
-  auth.onAuthStateChanged((user) => {
-    isLoggedIn.value = !!user;
-  });
-});
 </script>
 
 <style scoped>

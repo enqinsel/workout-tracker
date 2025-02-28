@@ -1,4 +1,7 @@
-export const achievements = {
+import { ref } from 'vue'
+
+// achievements'i reactive yapalım
+export const achievements = ref({
   badges: [
     {
       id: 1,
@@ -58,4 +61,4 @@ export const achievements = {
       completed: false
     }
   }
-}; 
+}) 

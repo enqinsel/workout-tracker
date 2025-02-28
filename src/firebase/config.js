@@ -18,4 +18,7 @@ const app = initializeApp(firebaseConfig);
 
 // Firestore ve Auth servislerini al
 export const db = getFirestore(app);
-export const auth = getAuth(app); 
+export const auth = getAuth(app);
+
+// Google Auth için popup'ı yapılandır
+auth.useDeviceLanguage(); // Tarayıcı dilini kullan 

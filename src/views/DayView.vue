@@ -109,9 +109,25 @@ const gununHareketleri = computed(() => {
 
 const selectedGif = ref(null);
 
-const currentDayGoal = computed(() => achievements.goals.daily[currentDay.value]);
-const weeklyGoal = computed(() => achievements.goals.weekly);
-const unlockedBadges = computed(() => achievements.badges.filter(badge => badge.unlocked));
+const currentDayGoal = computed(() => {
+  return achievements.value?.goals?.daily?.[currentDay.value] || {
+    progress: 0,
+    target: 1,
+    completed: false
+  };
+});
+
+const weeklyGoal = computed(() => {
+  return achievements.value?.goals?.weekly || {
+    progress: 0,
+    target: 3,
+    completed: false
+  };
+});
+
+const unlockedBadges = computed(() => {
+  return achievements.value?.badges?.filter(badge => badge.unlocked) || [];
+});
 
 const userId = ref(null);
 
@@ -125,9 +141,12 @@ const loadProgress = async () => {
     
     if (docSnap.exists()) {
       const data = docSnap.data();
-      achievements.goals.daily = data.dailyGoals;
-      achievements.goals.weekly = data.weeklyGoal;
-      achievements.badges = data.badges;
+      // Tüm achievements verisini güncelle
+      achievements.value = {
+        ...achievements.value,
+        badges: data.badges,
+        goals: data.goals
+      };
     }
   } catch (error) {
     console.error("Error loading progress:", error);
@@ -140,9 +159,8 @@ const saveProgress = async () => {
   
   try {
     await setDoc(doc(db, "progress", userId.value), {
-      dailyGoals: achievements.goals.daily,
-      weeklyGoal: achievements.goals.weekly,
-      badges: achievements.badges,
+      badges: achievements.value.badges,
+      goals: achievements.value.goals,
       lastUpdated: new Date().toISOString()
     });
   } catch (error) {
@@ -150,16 +168,19 @@ const saveProgress = async () => {
   }
 };
 
-// Kullanıcı oturum durumunu kontrol et
+// Kullanıcı oturum durumunu kontrol et ve verileri yükle
 onMounted(() => {
-  onAuthStateChanged(auth, (user) => {
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
     if (user) {
       userId.value = user.uid;
-      loadProgress(); // Kullanıcı verilerini yükle
+      await loadProgress(); // Kullanıcı verilerini yükle
     } else {
       userId.value = null;
     }
   });
+
+  // Component unmount olduğunda listener'ı temizle
+  return () => unsubscribe();
 });
 
 const openModal = (hareket) => {
@@ -175,18 +196,68 @@ const closeModal = () => {
 // completeWorkout fonksiyonunu güncelle
 const completeWorkout = async () => {
   if (!currentDayGoal.value.completed) {
-    currentDayGoal.value.progress = 1;
-    currentDayGoal.value.completed = true;
+    // Eğer achievements.value henüz yüklenmemişse, varsayılan yapıyı oluştur
+    if (!achievements.value.goals) {
+      achievements.value = {
+        goals: {
+          daily: {
+            [currentDay.value]: {
+              id: Number(currentDay.value),
+              name: `${currentDay.value}. Gün Antrenmanı`,
+              progress: 0,
+              target: 1,
+              completed: false
+            }
+          },
+          weekly: {
+            progress: 0,
+            target: 3,
+            completed: false
+          }
+        },
+        badges: [
+          {
+            id: 1,
+            name: "Yeni Başlayan",
+            icon: "🎯",
+            unlocked: false
+          },
+          {
+            id: 2,
+            name: "Düzenli Sporcu",
+            icon: "💪",
+            unlocked: false
+          }
+        ]
+      };
+    }
+
+    // Günlük hedefi güncelle
+    if (!achievements.value.goals.daily[currentDay.value]) {
+      achievements.value.goals.daily[currentDay.value] = {
+        id: Number(currentDay.value),
+        name: `${currentDay.value}. Gün Antrenmanı`,
+        progress: 0,
+        target: 1,
+        completed: false
+      };
+    }
+
+    achievements.value.goals.daily[currentDay.value].progress = 1;
+    achievements.value.goals.daily[currentDay.value].completed = true;
     
-    weeklyGoal.value.progress++;
+    // Haftalık hedefi güncelle
+    achievements.value.goals.weekly.progress++;
     
-    if (!achievements.badges[0].unlocked) {
-      achievements.badges[0].unlocked = true;
+    // İlk rozeti aç
+    if (!achievements.value.badges[0].unlocked) {
+      achievements.value.badges[0].unlocked = true;
     }
     
-    if (weeklyGoal.value.progress >= weeklyGoal.value.target) {
-      achievements.badges[1].unlocked = true;
-      weeklyGoal.value.completed = true;
+    // Tüm günler tamamlandıysa haftalık rozeti aç
+    if (achievements.value.goals.weekly.progress >= achievements.value.goals.weekly.target) {
+      achievements.value.badges[1].unlocked = true;
+      achievements.value.goals.weekly.completed = true;
       alert('Tebrikler! Tüm haftayı tamamladınız! 🎉');
     }
 

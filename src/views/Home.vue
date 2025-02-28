@@ -1,6 +1,8 @@
 <template>
   <div class="home">
-    <Login v-if="!isLoggedIn" />
+    <template v-if="!isLoggedIn">
+      <Login />
+    </template>
     <template v-else>
       <h1>Antrenman Programı</h1>
       <div class="days-container">
@@ -25,9 +27,11 @@ import Login from '../components/Login.vue';
 const isLoggedIn = ref(false);
 
 onMounted(() => {
-  auth.onAuthStateChanged((user) => {
+  const unsubscribe = auth.onAuthStateChanged((user) => {
     isLoggedIn.value = !!user;
   });
+
+  return () => unsubscribe();
 });
 </script>
 
