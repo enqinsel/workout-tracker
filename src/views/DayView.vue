@@ -96,9 +96,9 @@ const currentDay = computed(() => route.params.id);
 
 const gunBasligi = computed(() => {
   switch(currentDay.value) {
-    case "1": return "Göğüs-Ön Kol";
-    case "2": return "Sırt-Arka Kol";
-    case "3": return "Omuz-Bacak";
+    case "1": return "Göğüs + Arka Kol + Karın";
+    case "2": return "Sırt + Ön Kol";
+    case "3": return "Omuz + Bacak + Karın";
     default: return "";
   }
 });

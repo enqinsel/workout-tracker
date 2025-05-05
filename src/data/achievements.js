@@ -29,7 +29,7 @@ export const achievements = ref({
     daily: {
       1: {
         id: 1,
-        name: "1. Gün: Göğüs-Ön Kol",
+        name: "1. Gün: Göğüs + Arka Kol + Karın",
         description: "1. gün antrenmanını tamamla",
         progress: 0,
         target: 1,
@@ -37,7 +37,7 @@ export const achievements = ref({
       },
       2: {
         id: 2,
-        name: "2. Gün: Sırt-Arka Kol",
+        name: "2. Gün: Sırt + Ön Kol",
         description: "2. gün antrenmanını tamamla",
         progress: 0,
         target: 1,
@@ -45,7 +45,7 @@ export const achievements = ref({
       },
       3: {
         id: 3,
-        name: "3. Gün: Omuz-Bacak",
+        name: "3. Gün: Omuz + Bacak + Karın",
         description: "3. gün antrenmanını tamamla",
         progress: 0,
         target: 1,
